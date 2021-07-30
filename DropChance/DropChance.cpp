@@ -1,9 +1,18 @@
 #include <iostream>
-#include <time.h>
+#include <chrono>
 #include <string>
 #include <thread>
-#include <windows.system.threading.h>
+#include <random>
 
+/// <summary>
+/// Parses inputs passed on command line
+/// </summary>
+/// <param name="argc"></param>
+/// <param name="argv"></param>
+/// <param name="x"></param>
+/// <param name="y"></param>
+/// <param name="z"></param>
+/// <returns> Parsed Correctly </returns>
 bool ParseInputs(uint64_t argc, char* argv[], float_t* x, uint64_t* y, uint64_t* z)
 {
 	if (argc < 4 || argc >= 5)
@@ -13,31 +22,48 @@ bool ParseInputs(uint64_t argc, char* argv[], float_t* x, uint64_t* y, uint64_t*
 	*y = std::stoi(argv[2]);
 	*z = std::stoi(argv[3]);
 
-	//check for sanitation
-	if (*x > 100 || *x < 0)
+	//check for sanitation of inputs
+	if (*x > 100 || *x < 0 || *y < 1 || *z < 1)
 		return false;
+
+	//offer quidance
+	if (*z < 1337)
+		std::cout << "\n Low trial counts may lead to unexpected and abnormal results.\n Results may be more accurate with greater than " << *z << " tests\n";
 
 	return true;
 }
 
+/// <summary>
+/// Output if fault occured with entry
+/// </summary>
 void PrintManPage()
 {
 	std::cerr
-		<< "\n    itmchnce.exe [float - percentage] [integer - number of chests] [intiger - number of trials]\n"
-		<< "\tA small program that checks multiple chests for item chances. The test checks only if item was found, not of what quantity.\n" 
-		<< "\tIt performs this check in trials to catch anomolous outcomes. Nondeterministic, uses system time as seed.\n";
+		<< "\n\tdropchance.exe [float - percentage] [integer - number of chests] [intiger - number of trials]\n"
+		<< "  Virtually checks multiple chests for item chances. The test checks only if item was found, not of what quantity.\n"
+		<< "  It performs this check in trials to catch anomolous outcomes. Nondeterministic, uses system time as seed.\n";
 }
 
-void RunTest(uint64_t* outcome, const float_t& percent, const int32_t& chests, const int32_t& trials)
+struct TestData {
+	uint64_t* outcome;
+	float_t percent;
+	uint64_t chests;
+	uint64_t trials;
+};
+
+void RunTest(TestData data)
 {
 	bool got = false;
-	for (size_t i = 0; i < trials; i++)
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_int_distribution<> randVal(0, 100);
+	*data.outcome = 0;
+	for (uint64_t i = 0; i < data.trials; i++)
 	{
-		for (size_t j = 0; j < chests; j++)
-			if (got = ((rand() % 100) <= percent))break;
+		for (uint64_t j = 0; j < data.chests; j++)
+			if (got = (randVal(gen) <= data.percent))break;
 
-		outcome += (got);
-
+		*data.outcome += (got);
 	}
 }
 
@@ -57,16 +83,44 @@ int main(int32_t argc, char* argv[])
 	}
 
 	//set up if inputs are valid
-	const int coreCount = std::thread::hardware_concurrency();
+	std::cout << "\n " << percent << "% drop over " << chests << " chest(s), " << trials << " times.\n";
 
-	std::cout << "\n" << percent << "\% drop over " << chests << " chest(s), " << trials << " times.\n";
-	srand(time(NULL));
+	std::chrono::steady_clock::time_point startOp = std::chrono::high_resolution_clock::now();
 
-	
+	const uint16_t coreCount = std::thread::hardware_concurrency();
 
+	std::thread* threads = new std::thread[coreCount + 1];
+	TestData* data = new TestData[coreCount + 1];
+	uint64_t* results = new uint64_t[coreCount + 1];
+
+	uint64_t split = trials / coreCount;
+
+	for (uint64_t i = 0; i < coreCount + 1; i++)
+	{
+		data[i] = { &results[i], percent, chests, (i < coreCount - 1 && coreCount > 1) ? split : trials % coreCount };//if last entry and more than one core, throw remainder
+		threads[i] = std::thread(RunTest, data[i]);
+	}
+
+	for (uint64_t i = 0; i < coreCount + 1; i++)
+	{
+		threads[i].join();
+		result += results[i];
+	}
+
+	std::chrono::steady_clock::time_point stopOp = std::chrono::high_resolution_clock::now();
+	uint64_t elapsed = std::chrono::duration_cast<std::chrono::microseconds>(stopOp - startOp).count();
 
 	float_t avg = (result / (float_t)trials) * 100.0f;
 
-	std::cout << "\n Average chance: " << avg << "\%\n";
+	std::cout << "\n Average drop chance: " << avg << "%";
+	if (elapsed > 10000000)
+		std::cout << " found in " << elapsed / 1000000 << " seconds\n";
+	else if (elapsed > 10000)
+		std::cout << " found in " << elapsed / 1000 << " milliseconds\n";
+	else
+		std::cout << " found in " << elapsed << " microseconds\n";
 
+	delete[] threads;
+	delete[] results;
+	delete[] data;
 }
