@@ -348,3 +348,6 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+DropChance/DropChance.sln
+DropChance/DropChance.vcxproj
+DropChance/DropChance.vcxproj.filters
