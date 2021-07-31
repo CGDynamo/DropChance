@@ -57,7 +57,6 @@ void RunTest(TestData data)
 	std::random_device rd;
 	std::mt19937 gen(rd());
 	std::uniform_int_distribution<> randVal(0, 100);
-	*data.outcome = 0;
 	for (uint64_t i = 0; i < data.trials; i++)
 	{
 		for (uint64_t j = 0; j < data.chests; j++)
@@ -85,13 +84,13 @@ int main(int32_t argc, char* argv[])
 	//set up if inputs are valid
 	std::cout << "\n " << percent << "% drop over " << chests << " chest(s), " << trials << " times.\n";
 
-	std::chrono::steady_clock::time_point startOp = std::chrono::high_resolution_clock::now();
+	auto startOp = std::chrono::high_resolution_clock::now();
 
-	const uint16_t coreCount = std::thread::hardware_concurrency();
+	const uint64_t coreCount = std::thread::hardware_concurrency();
 
 	std::thread* threads = new std::thread[coreCount + 1];
 	TestData* data = new TestData[coreCount + 1];
-	uint64_t* results = new uint64_t[coreCount + 1];
+	uint64_t* results = new uint64_t[coreCount + 1]{0};
 
 	uint64_t split = trials / coreCount;
 
@@ -107,7 +106,7 @@ int main(int32_t argc, char* argv[])
 		result += results[i];
 	}
 
-	std::chrono::steady_clock::time_point stopOp = std::chrono::high_resolution_clock::now();
+	auto stopOp = std::chrono::high_resolution_clock::now();
 	uint64_t elapsed = std::chrono::duration_cast<std::chrono::microseconds>(stopOp - startOp).count();
 
 	float_t avg = (result / (float_t)trials) * 100.0f;
