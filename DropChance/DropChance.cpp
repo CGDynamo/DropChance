@@ -56,11 +56,11 @@ void RunTest(TestData data)
 	bool got = false;
 	std::random_device rd;
 	std::mt19937 gen(rd());
-	std::uniform_int_distribution<> randVal(0, 100);
+	std::uniform_int_distribution<> randVal(0, 10000);
 	for (uint64_t i = 0; i < data.trials; i++)
 	{
 		for (uint64_t j = 0; j < data.chests; j++)
-			if (got = (randVal(gen) <= data.percent))break;
+			if (got = ((randVal(gen) *0.01f) <= data.percent))break;
 
 		*data.outcome += (got);
 	}
